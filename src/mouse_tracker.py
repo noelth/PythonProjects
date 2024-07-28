@@ -1,8 +1,8 @@
 import sys
 import math
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QWidget, QLabel, QVBoxLayout, QPushButton
-from PyQt5.QtGui import QIcon, QCursor
-from PyQt5.QtCore import QTimer, Qt
+#from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QWidget, QLabel, QVBoxLayout, QPushButton
+#from PyQt5.QtGui import QIcon, QCursor
+#from PyQt5.QtCore import QTimer, Qt
 
 class MouseTracker(QWidget):
     def __init__(self):
