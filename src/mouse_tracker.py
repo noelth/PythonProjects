@@ -1,10 +1,9 @@
 import sys
+import os
 import math
-import threading
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
-from PyQt5.QtGui import QIcon, QCursor
-from PyQt5.QtCore import QTimer, Qt
-from pynput import mouse
+from PyQt5.QtGui import QIcon, QCursor, QScreen
+from PyQt5.QtCore import QTimer, Qt, QPoint
 
 class MouseTracker:
     def __init__(self, tray_icon):
@@ -18,14 +17,18 @@ class MouseTracker:
         self.menu = QMenu()
         self.distance_action = QAction("Mouse travel: 0 km 0 m 0 cm 0 mm", self.menu)
         self.distance_action.triggered.connect(self.reset_stats)
+        
         quit_action = QAction("Quit", self.menu)
-        quit_action.triggered.connect(QApplication.instance().quit)
+        quit_action.triggered.connect(self.quit_app)  # Connect to quit_app method
 
         self.menu.addAction(self.distance_action)
         self.menu.addAction(quit_action)
 
-        # Set the context menu to the tray icon
-        self.tray_icon.setContextMenu(self.menu)
+        # Remove or comment out the following line to prevent automatic context menu on right-click
+        # self.tray_icon.setContextMenu(self.menu)
+
+        # Connect the activated signal to the handle_tray_icon_click method
+        self.tray_icon.activated.connect(self.handle_tray_icon_click)
 
         # Start a timer to update the distance
         self.timer = QTimer()
@@ -57,28 +60,33 @@ class MouseTracker:
     def reset_stats(self):
         self.total_distance = 0
         self.update_label()
+        self.menu.hide()  # Ensure the menu is hidden after resetting
+        QTimer.singleShot(0, self.show_menu)  # Show the menu again if needed
 
-    def handle_click(self, x, y, button, pressed):
-        if pressed:
-            print(f"Mouse button {button} pressed at ({x}, {y})")
-            if button == mouse.Button.left:
-                if self.menu.isVisible():
-                    self.menu.hide()
-                else:
-                    print("Left button action outside context menu")
-            elif button == mouse.Button.right:
-                print("Right button action")
-                self.show_menu(x, y)
+    def handle_tray_icon_click(self, reason):
+        if reason == QSystemTrayIcon.Trigger:  # Left-click
+            if self.menu.isVisible():
+                QTimer.singleShot(0, self.menu.hide)
+                print("Menu closed")  # Added comment to indicate menu closed
+            else:
+                QTimer.singleShot(0, self.show_menu)
 
-    def show_menu(self, x, y):
-        self.menu.exec_(QCursor.pos())
+    def show_menu(self):
+        # Calculate the position to show the menu
+        icon_geometry = self.tray_icon.geometry()
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        menu_x = icon_geometry.left()
+        menu_y = icon_geometry.bottom()
 
-def start_mouse_listener(mouse_tracker):
-    def on_click(x, y, button, pressed):
-        mouse_tracker.handle_click(x, y, button, pressed)
+        # Adjust the position to align with the bottom-left corner of the tray icon
+        self.menu.move(QPoint(menu_x, menu_y))
+        self.menu.exec_(self.menu.pos())
 
-    with mouse.Listener(on_click=on_click) as listener:
-        listener.join()
+    def quit_app(self):
+        print("Quitting application")
+        self.tray_icon.hide()  # Hide the tray icon before quitting
+        QApplication.quit()  # Ensures the application quits immediately
+        os._exit(0)  # Forcefully terminate the Python process
 
 def main():
     app = QApplication(sys.argv)
@@ -94,11 +102,6 @@ def main():
     mouse_tracker = MouseTracker(tray_icon)
 
     tray_icon.show()
-
-    # Start the mouse listener in a separate thread
-    listener_thread = threading.Thread(target=start_mouse_listener, args=(mouse_tracker,))
-    listener_thread.daemon = True
-    listener_thread.start()
 
     sys.exit(app.exec_())
 
