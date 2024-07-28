@@ -104,7 +104,7 @@ def main():
     app.setQuitOnLastWindowClosed(False)
 
     # Load the tray icon
-    icon_path = ":/qt-project.org/styles/commonstyle/images/standardbutton-help-32.png"
+    icon_path = "mticon.png"
     icon = QIcon(icon_path)
 
     tray_icon = QSystemTrayIcon(icon, app)

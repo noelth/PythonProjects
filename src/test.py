@@ -1,7 +1,9 @@
 from pynput import mouse
-
+This is edit file and after staged
+added something here
 # Define the event handler functions
 def on_click(x, y, button, pressed):
+    print(f"The button is: {pressed} ")
     if pressed:
         print(f"Mouse button {button} pressed at ({x}, {y})")
     else:
