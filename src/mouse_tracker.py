@@ -1,58 +1,42 @@
 import sys
 import math
-#from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QWidget, QLabel, QVBoxLayout, QPushButton
-#from PyQt5.QtGui import QIcon, QCursor
-#from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
+from PyQt5.QtGui import QIcon, QCursor
+from PyQt5.QtCore import QTimer, QObject, QEvent
 
-class MouseTracker(QWidget):
-    def __init__(self):
+class GlobalMouseEventFilter(QObject):
+    def __init__(self, callback):
         super().__init__()
+        self.callback = callback
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.MouseButtonPress:
+            self.callback()
+        return super().eventFilter(obj, event)
+
+class MouseTracker:
+    def __init__(self, tray_icon):
+        self.total_distance = 0
+        self.last_position = QCursor.pos()
+        self.tray_icon = tray_icon
         self.initUI()
 
     def initUI(self):
-        self.total_distance = 0
-        self.last_position = QCursor.pos()
+        # Create the context menu and actions
+        self.menu = QMenu()
+        self.distance_action = QAction("Mouse travel: 0 km 0 m 0 cm 0 mm", self.menu)
+        self.distance_action.triggered.connect(self.reset_stats)
+        quit_action = QAction("Quit", self.menu)
+        quit_action.triggered.connect(QApplication.instance().quit)
 
-        self.label = QLabel("Your mouse has travelled 0 km 0 m 0 cm 0 mm", self)
-        self.reset_button = QPushButton('Reset', self)
-        self.reset_button.clicked.connect(self.reset_stats)
+        self.menu.addAction(self.distance_action)
+        self.menu.addAction(quit_action)
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.label)
-        layout.addWidget(self.reset_button)
-        self.setLayout(layout)
+        # Set the context menu to the tray icon
+        self.tray_icon.setContextMenu(self.menu)
 
-        self.setGeometry(300, 300, 400, 200)
-        self.setWindowTitle('Mouse Tracker')
-
-        # Set window flags to make it frameless, always on top, and a tool window
-        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-
-        # Apply styles to make the window semi-transparent and match the dark UI theme
-        self.setStyleSheet("""
-            QWidget {
-                background-color: rgba(0, 0, 0, 180);  /* Semi-transparent black background */
-                color: white;
-                border-radius: 10px;  /* Rounded corners */
-            }
-            QLabel {
-                font-size: 18px;
-                color: white;
-            }
-            QPushButton {
-                background-color: rgba(50, 50, 50, 180);  /* Semi-transparent button background */
-                color: white;
-                border: 1px solid white;
-                border-radius: 5px;  /* Rounded corners for the button */
-                padding: 10px;
-            }
-            QPushButton:hover {
-                background-color: rgba(70, 70, 70, 180);  /* Darker button background on hover */
-            }
-        """)
-
-        self.timer = QTimer(self)
+        # Start a timer to update the distance
+        self.timer = QTimer()
         self.timer.timeout.connect(self.track_mouse)
         self.timer.start(100)  # Track mouse every 100 milliseconds
 
@@ -76,11 +60,15 @@ class MouseTracker(QWidget):
         m = (total_mm // 1000) % 1000
         cm = (total_mm // 10) % 100
         mm = total_mm % 10
-        self.label.setText(f"Your mouse has travelled {km} km {m} m {cm} cm {mm} mm")
+        self.distance_action.setText(f"Mouse travel: {km} km {m} m {cm} cm {mm} mm")
 
     def reset_stats(self):
         self.total_distance = 0
         self.update_label()
+
+    def close_menu(self):
+        if self.menu.isVisible():
+            self.menu.hide()
 
 def main():
     app = QApplication(sys.argv)
@@ -88,27 +76,18 @@ def main():
     # Hide the application from the dock and application switcher
     app.setQuitOnLastWindowClosed(False)
 
-    # Use a standard PyQt5 icon for the system tray
-    tray_icon = QSystemTrayIcon(QIcon(":/qt-project.org/styles/commonstyle/images/standardbutton-help-32.png"), app)
-    tray_menu = QMenu()
-    quit_action = QAction("Quit", app)
-    quit_action.triggered.connect(app.quit)
-    tray_menu.addAction(quit_action)
-    tray_icon.setContextMenu(tray_menu)
+    # Load the tray icon
+    icon_path = ":/qt-project.org/styles/commonstyle/images/standardbutton-help-32.png"
+    icon = QIcon(icon_path)
+
+    tray_icon = QSystemTrayIcon(icon, app)
+    mouse_tracker = MouseTracker(tray_icon)
+
+    # Create and install the global event filter to detect clicks outside the context menu
+    event_filter = GlobalMouseEventFilter(mouse_tracker.close_menu)
+    app.installEventFilter(event_filter)
+
     tray_icon.show()
-
-    tracker = MouseTracker()
-
-    def on_tray_icon_activated(reason):
-        if reason == QSystemTrayIcon.Trigger:  # Left click
-            if tracker.isVisible():
-                tracker.hide()
-            else:
-                tracker.show()
-                tracker.raise_()
-                tracker.activateWindow()
-
-    tray_icon.activated.connect(on_tray_icon_activated)
 
     sys.exit(app.exec_())
 
