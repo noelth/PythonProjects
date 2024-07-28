@@ -1,18 +1,10 @@
 import sys
 import math
+import threading
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtGui import QIcon, QCursor
-from PyQt5.QtCore import QTimer, QObject, QEvent
-
-class GlobalMouseEventFilter(QObject):
-    def __init__(self, callback):
-        super().__init__()
-        self.callback = callback
-
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.MouseButtonPress:
-            self.callback()
-        return super().eventFilter(obj, event)
+from PyQt5.QtCore import QTimer, Qt
+from pynput import mouse
 
 class MouseTracker:
     def __init__(self, tray_icon):
@@ -66,9 +58,27 @@ class MouseTracker:
         self.total_distance = 0
         self.update_label()
 
-    def close_menu(self):
-        if self.menu.isVisible():
-            self.menu.hide()
+    def handle_click(self, x, y, button, pressed):
+        if pressed:
+            print(f"Mouse button {button} pressed at ({x}, {y})")
+            if button == mouse.Button.left:
+                if self.menu.isVisible():
+                    self.menu.hide()
+                else:
+                    print("Left button action outside context menu")
+            elif button == mouse.Button.right:
+                print("Right button action")
+                self.show_menu(x, y)
+
+    def show_menu(self, x, y):
+        self.menu.exec_(QCursor.pos())
+
+def start_mouse_listener(mouse_tracker):
+    def on_click(x, y, button, pressed):
+        mouse_tracker.handle_click(x, y, button, pressed)
+
+    with mouse.Listener(on_click=on_click) as listener:
+        listener.join()
 
 def main():
     app = QApplication(sys.argv)
@@ -83,11 +93,12 @@ def main():
     tray_icon = QSystemTrayIcon(icon, app)
     mouse_tracker = MouseTracker(tray_icon)
 
-    # Create and install the global event filter to detect clicks outside the context menu
-    event_filter = GlobalMouseEventFilter(mouse_tracker.close_menu)
-    app.installEventFilter(event_filter)
-
     tray_icon.show()
+
+    # Start the mouse listener in a separate thread
+    listener_thread = threading.Thread(target=start_mouse_listener, args=(mouse_tracker,))
+    listener_thread.daemon = True
+    listener_thread.start()
 
     sys.exit(app.exec_())
 
