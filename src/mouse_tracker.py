@@ -24,9 +24,6 @@ class MouseTracker:
         self.menu.addAction(self.distance_action)
         self.menu.addAction(quit_action)
 
-        # Remove or comment out the following line to prevent automatic context menu on right-click
-        # self.tray_icon.setContextMenu(self.menu)
-
         # Connect the activated signal to the handle_tray_icon_click method
         self.tray_icon.activated.connect(self.handle_tray_icon_click)
 
@@ -58,18 +55,28 @@ class MouseTracker:
         self.distance_action.setText(f"Mouse travel: {km} km {m} m {cm} cm {mm} mm")
 
     def reset_stats(self):
+        print("Reset")  # Added comment to indicate values reset
         self.total_distance = 0
         self.update_label()
-        self.menu.hide()  # Ensure the menu is hidden after resetting
-        QTimer.singleShot(0, self.show_menu)  # Show the menu again if needed
+        print(f"Menu visibility before reset: {self.menu.isVisible()}")
+        if self.menu.isVisible():
+            print("Menu remains open after reset")
+        else:
+            print("Menu is not visible after reset")
+            QTimer.singleShot(0, self.show_menu)  # Show the menu again if needed
+        print(f"Menu visibility after reset: {self.menu.isVisible()}")
 
     def handle_tray_icon_click(self, reason):
         if reason == QSystemTrayIcon.Trigger:  # Left-click
+            print(f"Menu visibility before click: {self.menu.isVisible()}")
             if self.menu.isVisible():
-                QTimer.singleShot(0, self.menu.hide)
+                self.menu.hide()
                 print("Menu closed")  # Added comment to indicate menu closed
             else:
                 QTimer.singleShot(0, self.show_menu)
+                self.menu.show()
+                print("Menu opened")  # Added comment to indicate menu opened
+            print(f"Menu visibility after click: {self.menu.isVisible()}")
 
     def show_menu(self):
         # Calculate the position to show the menu
@@ -80,7 +87,9 @@ class MouseTracker:
 
         # Adjust the position to align with the bottom-left corner of the tray icon
         self.menu.move(QPoint(menu_x, menu_y))
-        self.menu.exec_(self.menu.pos())
+        self.menu.show()
+        print("Menu moved and shown")
+        print(f"Menu visibility in show_menu: {self.menu.isVisible()}")
 
     def quit_app(self):
         print("Quitting application")
